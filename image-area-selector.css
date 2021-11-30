@@ -4,14 +4,13 @@
 
 #selector-container {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   display: inline-block;
 }
 
 #selector-move {
   position: absolute;
   box-shadow: 0 0 0 20000px rgba(0, 0, 0, 0.5);
-  /* border: 3px dotted black; */
   cursor: move;
 }
 
@@ -61,4 +60,13 @@
   border-bottom: 5px solid black;
   border-right: 5px solid black;
   cursor: se-resize;
+}
+
+#selector-container .cross-point {
+  position: absolute;
+  cursor: move;
+  width: 24px;
+  height: 24px;
+  color: crimson;
+  transform: translate(-50%, -50%);
 }

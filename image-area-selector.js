@@ -16,7 +16,7 @@
       return new Selector(options)
     }
 
-    var defaultOptions = {
+    const defaultOptions = {
       imgId: 'img',
       className: 'container',
       onStart: null,
@@ -28,8 +28,22 @@
       maxHeight: 300,
       relative: false,
       keepAspect: true,
-      customRatio: true
-    }
+      customRatio: true,
+      showCrossPoint: false,
+      crossPointSvg: String.raw`<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <circle cx="12" cy="12" r="6" />
+  <circle cx="12" cy="12" r="2" />
+</svg>`
+    };
     this.options = this.extend(options, defaultOptions);
 
     this._setProps();
@@ -66,7 +80,15 @@
         originX: 0,
         originY: 0,
         resizing: '',
-        initialRectangle: {}
+        crossPoint: {
+          x: 0,
+          y: 0,
+          mousedown: false,
+          offsetX: 0,
+          offsetY: 0,
+          width: 1,
+          height: 1
+        }
       };
     },
     _customEventIE: function () {
@@ -86,14 +108,30 @@
       CustomEvent.prototype = window.Event.prototype;
       window.CustomEvent = CustomEvent;
     },
-    _clone: function (obj) {
-      var o = {};
-      for (var prop in obj) {
-        if (obj.hasOwnProperty(prop)) {
-          o[prop] = obj[prop];
-        }
+    _clone: function deepCopy(obj) {
+      // See https://stackoverflow.com/a/53771927/564642
+      // Thanks HectorGuo!
+      if(typeof obj !== 'object' || obj === null) {
+        return obj;
       }
-      return o;
+    
+      if(obj instanceof Date) {
+        return new Date(obj.getTime());
+      }
+    
+      if(obj instanceof Array) {
+        return obj.reduce((arr, item, i) => {
+          arr[i] = deepCopy(item);
+          return arr;
+        }, []);
+      }
+    
+      if(obj instanceof Object) {
+        return Object.keys(obj).reduce((newObj, key) => {
+          newObj[key] = deepCopy(obj[key]);
+          return newObj;
+        }, {})
+      }
     },
     _triggerEvent: function (eventName, type) {
       if (!this._img) return;
@@ -122,7 +160,7 @@
         var notLoaded = function () {
           img.onload = function () {
             that.logic(this);
-            if (show === true) that.show();
+            if (show === true) that.show(that.options.showCrossPoint);
           }
         }
 
@@ -131,7 +169,7 @@
         } else {
           try {
             that.logic(img);
-            if (show === true) that.show();
+            if (show === true) that.show(that.options.showCrossPoint);
           } catch (ex) {
             notLoaded();
           }
@@ -179,6 +217,10 @@
         height: this._props.height / this._props.ratio,
         x: this._props.x / this._props.ratio,
         y: this._props.y / this._props.ratio,
+        crossPoint: {
+          x: this._props.crossPoint.x / this._props.ratio,
+          y: this._props.crossPoint.y / this._props.ratio
+        }
       };
     },
 
@@ -216,15 +258,36 @@
         that._props.x = (img.width / 2) - (that._props.width / 2);
         that._props.y = (img.height / 2) - (that._props.height / 2);
       }
+      
+      if (that.options.initialCrossPoint && Object.keys(that.options.initialCrossPoint)) {
+        that._props.crossPoint.x = that.options.initialCrossPoint.x * that._props.ratio;
+        that._props.crossPoint.y = that.options.initialCrossPoint.y * that._props.ratio;
+      }
+      else {
+        that._props.crossPoint.x = 0;
+        that._props.crossPoint.y = 0;
+      }
 
       var oldProps = that._clone(that._props);
-
-      var selector = document.getElementById('selector-move');
-      if (selector) {
-        selector.remove();
+      
+      // Contain img with container
+      // `element` is the element you want to wrap
+      const container = document.getElementById('selector-container');
+      let selector = container ? container.querySelector('#selector-move') : null;
+      let crossPointElement = container ? container.querySelector('.cross-point'): null;
+      
+      if (container) {
+        if (selector) {
+          selector.remove();
+        }
+        if (crossPointElement) {
+          crossPointElement.remove();
+        }
       }
       
-      const isShown = selector ? (selector.style.display !== 'none') : false;
+      const
+         isShown = selector ? (selector.style.display !== 'none') : false,
+        isCrossPointShown = crossPointElement ? (crossPointElement.style.display !== 'none'): false;
 
       selector = document.createElement('div');
       selector.id = 'selector-move';
@@ -240,47 +303,76 @@
       var se = document.createElement('div');
       var sw = document.createElement('div');
 
-      resizor.id = "selector-resize"
+      resizor.id = "selector-resize";
       nw.className = "nw";
       ne.className = "ne";
       se.className = "se";
       sw.className = "sw";
-
-      var onMove = function (event) {
-
-        /* Get the image position and re-calculate mouses x,y */
-        var bounds = img.getBoundingClientRect();
-        var absX = event.clientX - bounds.left;
-        var absY = event.clientY - bounds.top;
-
+      
+      const parent = document.createElement('div');
+      parent.insertAdjacentHTML('afterbegin', that.options.crossPointSvg);
+      
+      crossPointElement = parent.querySelector("svg");
+      crossPointElement.classList.add("cross-point");
+      crossPointElement.style.top = that._props.crossPoint.y + 'px';
+      crossPointElement.style.left = that._props.crossPoint.x + 'px';
+      crossPointElement.style.display = isCrossPointShown ? 'block': 'none';
+      
+      const updateXY = (x, y, props, target) => {
         /* Stops the selector being auto-centred */
-        absX -= that._props.offsetX;
-        absY -= that._props.offsetY;
+        let absX = x - that._props.offsetX;
+        let absY = y - that._props.offsetY;
 
         /* Only move selector within bounds of the image */
-        if (absX > (img.width - that._props.width)) {
-          absX = img.width - that._props.width;
-        } else if (absX < 0) {
+        if (absX > (img.width - props.width)) {
+          absX = img.width - props.width;
+        }
+        else if (absX < 0) {
           absX = 0;
         }
 
-        if (absY > (img.height - that._props.height)) {
-          absY = img.height - that._props.height;
-        } else if (absY < 0) {
+        if (absY > (img.height - props.height)) {
+          absY = img.height - props.height;
+        }
+        else if (absY < 0) {
           absY = 0;
         }
 
         // Update selectors location
-        that._props.x = absX;
-        that._props.y = absY;
+        props.x = absX;
+        props.y = absY;
 
-        selector.style.top = absY + img.offsetTop + 'px';
-        selector.style.left = absX + img.offsetLeft + 'px';
+        target.style.top = absY + img.offsetTop + 'px';
+        target.style.left = absX + img.offsetLeft + 'px';
+      };
 
-        // If props have changed call on change fn
-        if (oldProps.x != that._props.x || oldProps.y != that._props.y) that._triggerEvent('onChange', 'Move');
-
-      }
+      const onMove = function (event) {
+        /* Get the image position and re-calculate mouses x,y */
+        const
+           bounds = img.getBoundingClientRect();
+        let
+          absX = event.clientX - bounds.left,
+          absY = event.clientY - bounds.top;
+        
+        if (that._props.mousedown) {
+          updateXY(absX, absY, that._props, selector);
+          
+          // If props have changed call on change fn
+          if (oldProps.x !== that._props.x || oldProps.y !== that._props.y) {
+            that._triggerEvent('onChange', 'Move');
+          }
+        }
+        else if (that._props.crossPoint.mousedown) {
+          updateXY(absX, absY, that._props.crossPoint, crossPointElement);
+          // If props have changed call on change fn
+          if (oldProps.crossPoint.x !== that._props.crossPoint.x || oldProps.crossPoint.y !== that._props.crossPoint.y) {
+            that._triggerEvent('onChange', 'Move');
+          }
+        }
+        else {
+          throw new Error("Move cannot happen if mouse not down");
+        }
+      };
 
       var onResize = function (event) {
 
@@ -422,27 +514,53 @@
       var docDown = function (event) {
         that._props.originX = event.clientX;
         that._props.originY = event.clientY;
-      }
+      };
 
-      var docUp = function () {
-        that._triggerEvent('onEnd', that._props.resizing ? 'Resize' : 'Move');
+      const docUp = function () {
+        that._triggerEvent(
+           'onEnd',
+           that._props.crossPoint.mousedown
+              ? 'MoveCrossPoint'
+              : that._props.resizing
+                 ? 'Resize'
+                 : 'Move'
+        );
 
         that._inProgress = false;
         that._props.mousedown = false;
         that._props.offsetX = 0;
         that._props.offsetY = 0;
         that._props.resizing = '';
-      }
+        that._props.crossPoint.mousedown = false;
+        that._props.crossPoint.offsetX = 0;
+        that._props.crossPoint.offsetY = 0;
+      };
 
-      var docMove = function (event) {
-        if (!that._props.mousedown) return;
-
-        if (that._props.resizing) onResize(event);
-        else onMove(event);
-
-        if (!that._inProgress) that._triggerEvent('onStart', that._props.resizing ? 'Resize' : 'Move');
-        that._inProgress = true;
-      }
+      const docMove = function (event) {
+        if (that._props.mousedown) {
+  
+          if (that._props.resizing) {
+            onResize(event);
+          }
+          else {
+            onMove(event);
+          }
+  
+          if (!that._inProgress) {
+            that._triggerEvent('onStart', that._props.resizing ? 'Resize' : 'Move');
+          }
+  
+          that._inProgress = true;
+        }
+        else if (that._props.crossPoint.mousedown) {
+          onMove(event);
+          if (!that._inProgress) {
+            that._triggerEvent('onStart', 'MoveCrossPoint');
+          }
+          
+          that._inProgress = true;
+        }
+      };
 
       var selDown = function (event) {
         that._props.mousedown = true;
@@ -450,33 +568,23 @@
         that._props.offsetY = event.offsetY || that._props.height / 2;
       }
 
-      document.onmousedown = function (event) {
-        docDown(event);
-      }
+      document.onmousedown =  docDown;
       document.ontouchstart = function (event) {
         if (event.touches.length > 0) docDown(event.touches[0]);
       }
 
-      document.onmouseup = function (event) {
-        docUp(event);
-      }
-      document.ontouchend = function (event) {
-        docUp();
-      }
+      document.onmouseup = docUp;
+      document.ontouchend = docUp;
 
-      document.onmousemove = function (event) {
-        docMove(event);
-      }
+      document.onmousemove = docMove;
       document.ontouchmove = function (event) {
         if (event.touches.length > 0) docMove(event.touches[0]);
       }
 
-      selector.onmousedown = function (event) {
-        selDown(event);
-      }
+      selector.onmousedown = selDown;
       selector.ontouchstart = function (event) {
         if (event.touches.length > 0) selDown(event.touches[0]);
-      }
+      };
 
       nw.onmousedown = function (event) {
         that._props.resizing = 'nw';
@@ -505,26 +613,38 @@
           if (event.touches.length > 0) that._props.resizing = 'se';
         }
       }
+      
+      const onCrossPointMouseDown = evt => {
+        that._props.crossPoint.mousedown = true;
+        that._props.crossPoint.offsetX = evt.offsetX || that._props.width / 2;
+        that._props.crossPoint.offsetY = evt.offsetY || that._props.height / 2;
+      }
+      
+      crossPointElement.onmousedown = onCrossPointMouseDown;
+      crossPointElement.ontouchstart = function (event) {
+        if (event.touches.length > 0) onCrossPointMouseDown(event.touches[0]);
+      };
 
       resizor.appendChild(nw);
       resizor.appendChild(ne);
       resizor.appendChild(sw);
       resizor.appendChild(se);
       selector.appendChild(resizor);
-
-      // Contain img with container
-      // `element` is the element you want to wrap
-      var container = document.getElementById('selector-container');
+      
       if (!container) {
-        var parent = img.parentNode;
-        container = document.createElement('div');
-        container.className = this.options.className;
-        container.id = 'selector-container';
-        parent.replaceChild(container, img);
-        container.appendChild(img);
+        const parent = img.parentNode;
+        const containerElement = document.createElement('div');
+        containerElement.className = this.options.className;
+        containerElement.id = 'selector-container';
+        parent.replaceChild(containerElement, img);
+        containerElement.appendChild(img);
       }
+      
       img.parentElement.appendChild(selector);
 
+      if (that.options.showCrossPoint) {
+        img.parentElement.appendChild(crossPointElement);
+      }
     },
 
     capture: function (crop) {
@@ -558,11 +678,20 @@
       return tnCanvas.toDataURL();
     },
 
-    show: function () {
+    show: function (isShowingCrossPoint) {
       setTimeout(function () {
         var selector = document.getElementById('selector-move');
-        if (!selector) return console.error('Element not loaded');
+        if (!selector) {
+          return console.error('Element not loaded');
+        }
         selector.style.display = 'block';
+        
+        if (isShowingCrossPoint) {
+          const element = document.querySelector('.cross-point');
+          if (element) {
+            element.style.display = 'block';
+          }
+        }
       }, 0);
 
       return this;
@@ -571,8 +700,15 @@
     hide: function () {
       setTimeout(function () {
         var selector = document.getElementById('selector-move');
-        if (!selector) return;
+        if (!selector) {
+          return;
+        }
         selector.style.display = 'none';
+        
+        const element = document.querySelector('.cross-point');
+          if (element) {
+            element.style.display = 'none';
+          }
       }, 0);
     }
   }

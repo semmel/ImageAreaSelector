@@ -70,6 +70,8 @@
           "  <tr><td>Height</td> <td>" + e.detail.values.height.toFixed(2) + "px</td></tr>" +
           "  <tr><td>X</td> <td>" + e.detail.values.x.toFixed(2) + "</td></tr>" +
           "  <tr><td>Y</td> <td>" + e.detail.values.y.toFixed(2) + "</td></tr>" +
+           "  <tr><td>PX</td> <td>" + e.detail.values.crossPoint.x.toFixed(2) + "</td></tr>" +
+           "  <tr><td>PY</td> <td>" + e.detail.values.crossPoint.y.toFixed(2) + "</td></tr>" +
           "</table>";
         document.getElementById('coords').innerHTML = html;
       },
@@ -84,7 +86,18 @@
       maxWidth: 400,
       minHeight: 100,
       maxHeight: 400,
-      relative: true
+      relative: false,
+      showCrossPoint: true,
+      initialRectangle: {
+        x: 80 * 4,
+        y: 20 * 4,
+        width: 200 * 4,
+        height: 130 * 4
+      },
+      initialCrossPoint: {
+        x: 150 * 4,
+        y: 220 * 4
+      }
     });
 
     selector.setup(true);

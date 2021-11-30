@@ -1,8 +1,10 @@
+[![NPM Version](https://img.shields.io/npm/v/image-area-selector.svg?style=flat-square)](https://www.npmjs.com/package/image-area-selector) ![Zero deps](https://img.shields.io/badge/dependencies-0-brightgreen)
+
 # Image Area Selector
-A Javascript plugin that selects an area of an image.
+A Javascript plugin that selects an area of an image together with an optional target point.
 
 ## Installation
-``npm install image-area-selector --save``
+`npm install image-area-selector`
 
 ## Screenshots
 You can view a live demo [here](https://www.iamrobert.co.uk/projects/image-area-selector).
@@ -41,7 +43,13 @@ var selector = new Selector({
     y: 0,                             // initial y coord
     width: 50,
     height: 50
-  }
+  }, 
+  showCrossPoint: true,
+  initialCrossPoint: {
+    x: 150 * 4,
+    y: 220 * 4
+  },
+  crossPointSvg: "<svg></svg>"      // custom svg image
 })
 
 // You can run this either before/after an image has loaded
@@ -52,14 +60,18 @@ selector.setup(true);
 select.show();
 select.hide();
 
-// Returns co-ordinates of the image
+// Returns coordinates of the image
 /* 
 {
   width:  number, // Native width in pixels
   height: number, // Native height in pixels
   x:      number, // Native start position x
   y:      number, // Native start position y
-  img:    string  // If you pass in true this will contain the cropped image.
+  img:    string,  // If you pass in true this will contain the cropped image.
+  crossPoint: {
+   x: number
+   y: number
+  }
 }
 */
 var result = select.capture(true);
@@ -69,79 +81,4 @@ var src = select.crop();
 ```
 
 ### Stylesheet
-Styling is up to you, but you can use the below for minimal styles.
-```css
-* {
-  box-sizing: border-box;
-}
-
-div {
-  position: relative;
-}
-
-img {
-  display: block;
-  width: 100%;
-  max-width: 500px;
-}
-
-#selector-container {
-  display: inline-block;
-  overflow: hidden;
-}
-
-#selector-move {
-  position: absolute;
-  box-shadow: 0 0 0 20000px rgba(0, 0, 0, 0.5);
-  /* border: 3px dotted black; */
-  cursor: move;
-}
-
-#selector-resize {
-  display: block;
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 1;
-}
-
-#selector-resize div {
-  position: absolute;
-  width: 15px;
-  height: 15px;
-}
-
-#selector-resize .nw {
-  top: 0;
-  left: 0;
-  border-top: 5px solid black;
-  border-left: 5px solid black;
-  cursor: nw-resize;
-}
-
-#selector-resize .ne {
-  top: 0;
-  right: 0;
-  border-top: 5px solid black;
-  border-right: 5px solid black;
-  cursor: ne-resize;
-}
-
-#selector-resize .sw {
-  bottom: 0;
-  left: 0;
-  border-bottom: 5px solid black;
-  border-left: 5px solid black;
-  cursor: sw-resize;
-}
-
-#selector-resize .se {
-  bottom: 0;
-  right: 0;
-  border-bottom: 5px solid black;
-  border-right: 5px solid black;
-  cursor: se-resize;
-}
-```
+Minimal styles are defined in `image-area-selector.css`.
