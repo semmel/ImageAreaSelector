@@ -44,7 +44,8 @@ var selector = new Selector({
     width: 50,
     height: 50
   }, 
-  showCrossPoint: true,
+  showCrossPoint: true, 
+  isCrossPointAttachedToBorder: false,
   initialCrossPoint: {
     x: 150 * 4,
     y: 220 * 4

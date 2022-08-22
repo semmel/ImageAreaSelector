@@ -30,6 +30,7 @@
       keepAspect: true,
       customRatio: true,
       showCrossPoint: false,
+      isCrossPointAttachedToBorder: false,
       crossPointSvg: String.raw`<svg
   xmlns="http://www.w3.org/2000/svg"
   viewBox="0 0 24 24"
@@ -318,6 +319,19 @@
       crossPointElement.style.left = that._props.crossPoint.x + 'px';
       crossPointElement.style.display = isCrossPointShown ? 'block': 'none';
       
+      const closestBorder = (x, y, w, h) => {
+        const distances = [
+           { d: x, border: "left"},
+          {d: w - x, border: "right"},
+          {d: y, border: "top"},
+          {d: h - y, border: "bottom"}
+        ],
+           minDistance = distances.reduce(
+              (prev, next) => next.d < prev.d ? next : prev
+           );
+        return minDistance.border;
+      };
+      
       const updateXY = (x, y, props, target) => {
         /* Stops the selector being auto-centred */
         let absX = x - that._props.offsetX;
@@ -336,6 +350,24 @@
         }
         else if (absY < 0) {
           absY = 0;
+        }
+        
+        if ((target === crossPointElement) && that.options.isCrossPointAttachedToBorder) {
+          const stickyBorder = closestBorder(absX, absY, img.width, img.height);
+          switch (stickyBorder) {
+            case "bottom":
+              absY = img.height;
+              break;
+            case "top":
+              absY = 0;
+              break;
+            case "left":
+              absX = 0;
+              break;
+            case "right":
+              absX = img.width;
+              break;
+          }
         }
 
         // Update selectors location
